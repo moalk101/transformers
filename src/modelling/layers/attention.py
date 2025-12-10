@@ -1,24 +1,25 @@
 import torch.nn as nn
 import torch
+import math
 
 
 class MultiHeadAttention(nn.Module):
     
-    def __init__(self,d_model, n_heads, future_mask=False):
+    def __init__(self,d_model, n_heads, mask_future=False):
         super().__init__()
         
         assert d_model % n_heads == 0, "number of heads must be divisible by number of heads!"
         
         self.d_model = d_model
         self.n_heads = n_heads
-        self.future_mask = future_mask
+        self.future_mask = mask_future
         self.d_k = d_model // n_heads
         
         
-        self.Wq = nn.Linear(d_model, d_model, bias=False)
-        self.Wk = nn.Linear(d_model, d_model, bias=False)
-        self.Wv = nn.Linear(d_model, d_model, bias=False)
-        self.Wo = nn.Linear(d_model, d_model, bias=False)
+        self.query_transform  = nn.Linear(d_model, d_model, bias=False)
+        self.key_transform    = nn.Linear(d_model, d_model, bias=False)
+        self.value_transform  = nn.Linear(d_model, d_model, bias=False)
+        self.output_transform = nn.Linear(d_model, d_model, bias=False)
         
     def split(self,x:torch.Tensor):
         """
@@ -33,7 +34,7 @@ class MultiHeadAttention(nn.Module):
         b,sq_len, d_model = x.size()
         
         x = x.view(b,sq_len,self.n_heads,self.d_k)
-        x = torch.permute(x,(0,2,1,3))
+        x = torch.permute(x,(0,2,1,3)).contiguous()
         return x
     
     def combine(self,x:torch.Tensor):
@@ -45,31 +46,36 @@ class MultiHeadAttention(nn.Module):
             x (torch.Tensor)
         """
         
-        b,sq_len,self.n_heads,self.d_k = x.size()
+        b, n_heads, sq_len, d_k = x.size()
         
         x = torch.permute(x,(0,2,1,3)).contiguous()
         x = x.view(b,sq_len,self.d_model)
         return x
     
-    def forward(self,q,k,v):
+    def forward(self,q,k,v,mask=None):
         
-        Q = self.split(self.Wq(q))
-        K = self.split(self.Wq(k))
-        V = self.split(self.Wq(v))
-        
+        Q = self.split(self.query_transform(q))
+        K = self.split(self.key_transform(k))
+        V = self.split(self.value_transform(v))
+        print(Q.shape, K.shape, V.shape)
         qk = torch.matmul(Q,K.transpose(-2,-1))
-        scaled_qk = torch.divide(qk,torch.sqrt(self.d_k))
+        scaled_qk = qk / math.sqrt(self.d_k)
+        
+        if mask is not None:
+            mask_expanded = mask[:, None, None, :]  
+            scaled_qk = scaled_qk.masked_fill(mask_expanded == 0, float('-inf'))
         
         if self.future_mask == True:
-            mask = torch.triu(torch.ones(scaled_qk.size(-2),scaled_qk.size(-1)),diagonal=1).bool()
-            mask = mask.expand(scaled_qk.size())
-            scaled_qk = scaled_qk.masked_fill(mask,float("-inf"))
+            seq_len = scaled_qk.size(-1)
+            future_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+            future_mask = future_mask.unsqueeze(0).unsqueeze(0)
+            scaled_qk = scaled_qk.masked_fill(future_mask,float("-inf"))
             
         attn = torch.softmax(scaled_qk,dim=-1)
         output = torch.matmul(attn,V)
         output = self.combine(output)
         
-        output = self.Wo(output)
+        output = self.output_transform(output)
         
         return output
             
