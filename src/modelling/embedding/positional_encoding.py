@@ -14,13 +14,13 @@ class PositionalEncoding(nn.Module):
         steps = torch.arange(0,d_model,2)
         
         pe[:,0::2] = torch.sin(positions / (10000) ** (steps / d_model))
-        pe[:,1::2] = torch.sin(positions / (10000) ** (steps / d_model))
+        pe[:,1::2] = torch.cos(positions / (10000) ** (steps / d_model))
 
         pe = pe.unsqueeze(0)
         
         self.register_buffer("pe",pe)    
         
-    def forfward(self,x):
+    def forward(self,x):
         
         length = x.size(1)
         
