@@ -61,15 +61,16 @@ class MultiHeadAttention(nn.Module):
         qk = torch.matmul(Q,K.transpose(-2,-1))
         scaled_qk = qk / math.sqrt(self.d_k)
         
-        if mask is not None:
-            mask_expanded = mask[:, None, None, :]  
-            scaled_qk = scaled_qk.masked_fill(mask_expanded == 0, float('-inf'))
-        
         if self.future_mask == True:
             seq_len = scaled_qk.size(-1)
             future_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
-            future_mask = future_mask.unsqueeze(0).unsqueeze(0)
+            while future_mask.dim() < scaled_qk.dim():
+                future_mask = future_mask.unsqueeze(0)
             scaled_qk = scaled_qk.masked_fill(future_mask,float("-inf"))
+        
+        if mask is not None:
+            mask = mask.unsqueeze(1).unsqueeze(2)
+            scaled_qk = scaled_qk.masked_fill(mask == 0, float("-inf"))
             
         attn = torch.softmax(scaled_qk,dim=-1)
         output = torch.matmul(attn,V)
@@ -78,7 +79,4 @@ class MultiHeadAttention(nn.Module):
         output = self.output_transform(output)
         
         return output
-            
-        
-        
         
