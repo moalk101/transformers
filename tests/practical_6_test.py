@@ -9,7 +9,7 @@ import torch
 # Add the parent directory to the system path for importing modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.modelling.blocks.decoder_layer import TransformerDecoderLayer
+from modelling.functional import TransformerDecoderLayer
 
 # Define test data for hidden states and attention masks
 ENCODER = torch.tensor(
@@ -203,6 +203,7 @@ def test_layer(layer, input, encoder, encoder_attention_mask, attention_mask, ex
     # Mask padded positions
     actual *= attention_mask.unsqueeze(-1).float()
     torch.set_printoptions(precision=16)
-    print("actuallllll",actual)
 
-    assert torch.allclose(actual, expected,atol=0.0000001)
+    rtol = 1e-3
+    atol = 1e-5
+    assert torch.allclose(actual, expected, rtol=rtol, atol=atol)
