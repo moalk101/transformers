@@ -63,7 +63,5 @@ class TransformerDecoderLayer(nn.Module):
         ff_out = self.feature_transformation(target)
         target = target + self.dropout1(ff_out)
         target = self.layer_norm_3(target)
-        print("targeeeeeeeeeeeet")
-        print(target)
         return target
     

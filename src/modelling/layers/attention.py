@@ -57,7 +57,6 @@ class MultiHeadAttention(nn.Module):
         Q = self.split(self.query_transform(q))
         K = self.split(self.key_transform(k))
         V = self.split(self.value_transform(v))
-        print(Q.shape, K.shape, V.shape)
         qk = torch.matmul(Q,K.transpose(-2,-1))
         scaled_qk = qk / math.sqrt(self.d_k)
         
