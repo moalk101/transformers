@@ -1,30 +1,22 @@
 import torch
 import torch.nn as nn
 
-from src.modelling.layers.attention import MultiHeadAttention
-from src.modelling.layers.feedforward import PostionalFeedForward
+from src.modelling.functional import BaseTransformerLayer
 
 
-class TransformerEncoder(nn.Module):
-    
-    def __init__(self,d_model, n_heads, feature_dim, dropout=0.1):
+class Encoder(nn.Module):
+    def __init__(
+        self, d_model,  n_heads, dim_feedforward, dropout, num_layers
+    ):
         super().__init__()
-        
-        self.attention = MultiHeadAttention(d_model,n_heads)
-        self.ff = PostionalFeedForward(d_model,feature_dim,dropout)
-        
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-        
-    def forward(self, x, mask = None):
-        attn_out = self.attention(x,x,x,mask)
-        x = x + self.dropout1(attn_out)
-        x = self.norm1(x)
-        
-        ff_out = self.ff(x)
-        x = x +self.dropout2(ff_out)
-        x = self.norm2(x)
-        
-        return x
+        self.encoder_layers = nn.ModuleList(
+            [
+                BaseTransformerLayer(d_model, n_heads, dim_feedforward, dropout)
+                for _ in range(num_layers)
+            ]
+        )
+
+    def forward(self, src_emb, src_mask):
+        for layer in self.encoder_layers:
+            src_emb = layer(src_emb, src_mask)
+        return src_emb
