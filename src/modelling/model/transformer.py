@@ -52,31 +52,36 @@ class Transformer(nn.Module):
     def generate(self, src, max_length=50):
         device = next(self.parameters()).device
         src = src.to(device)
-
+        PAD = 0
         batch_size = src.size(0)
+    
+        all_outputs = []
+    
+        for i in range(batch_size):
+            seq = src[i]
+            length = (seq != PAD).sum().item()
+            trimmed_seq = seq[:length].unsqueeze(0) 
+    
 
-        src_emb = self.embedding(src)
-        memory = self.encoder(src_emb, None)
+            src_emb = self.embedding(trimmed_seq)
+            memory = self.encoder(src_emb, None)
+    
 
-        tgt = torch.full(
-            (batch_size, 1),
-            1, 
-            device=device,
-            dtype=torch.long
-        )
-
-        for _ in range(max_length):
-            tgt_emb = self.embedding(tgt)
-            output = self.decoder(tgt_emb, memory, None, None)
-            logits = self.output_projection(output)
-
-            next_token = torch.argmax(logits[:, -1, :], dim=-1)
-            tgt = torch.cat([tgt, next_token.unsqueeze(1)], dim=1)
-
-            if (next_token == 2).all(): 
-                break
-
-        return tgt
+            tgt = torch.tensor([[1]], device=device, dtype=torch.long)
+    
+            for _ in range(max_length):
+                tgt_emb = self.embedding(tgt)
+                output = self.decoder(tgt_emb, memory, None, None)
+                logits = self.output_projection(output)
+                next_token = torch.argmax(logits[:, -1, :], dim=-1)
+                tgt = torch.cat([tgt, next_token.unsqueeze(1)], dim=1)
+                
+                if next_token.item() == 2:  
+                    break
+                
+            all_outputs.append(tgt.squeeze(0))  
+    
+        return all_outputs
 
 
     def forward(
