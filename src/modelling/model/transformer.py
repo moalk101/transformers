@@ -49,6 +49,36 @@ class Transformer(nn.Module):
 
         self.output_projection.weight = self.embedding.token_emb.embedding.weight
 
+    def generate(self, src, max_length=50):
+        device = next(self.parameters()).device
+        src = src.to(device)
+
+        batch_size = src.size(0)
+
+        src_emb = self.embedding(src)
+        memory = self.encoder(src_emb, None)
+
+        tgt = torch.full(
+            (batch_size, 1),
+            1, 
+            device=device,
+            dtype=torch.long
+        )
+
+        for _ in range(max_length):
+            tgt_emb = self.embedding(tgt)
+            output = self.decoder(tgt_emb, memory, None, None)
+            logits = self.output_projection(output)
+
+            next_token = torch.argmax(logits[:, -1, :], dim=-1)
+            tgt = torch.cat([tgt, next_token.unsqueeze(1)], dim=1)
+
+            if (next_token == 2).all(): 
+                break
+
+        return tgt
+
+
     def forward(
         self,
         src: torch.Tensor,
@@ -65,9 +95,11 @@ class Transformer(nn.Module):
             src_mask=src_mask,
         )
 
+        masked_encoder_output = encoder_output * src_mask.unsqueeze(-1)
+
         output = self.decoder(
             tgt_emb,
-            encoder_output,
+            masked_encoder_output,
             tgt_mask=tgt_mask,
             src_mask=src_mask
 

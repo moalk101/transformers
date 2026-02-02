@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from modelling.layers.attention import MultiHeadAttention
-from modelling.layers.feedforward import PostionalFeedForward
+from src.modelling.layers.attention import MultiHeadAttention
+from src.modelling.layers.feedforward import PostionalFeedForward
 
 
 class BaseTransformerLayer(nn.Module):

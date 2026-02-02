@@ -65,6 +65,7 @@ class MultiHeadAttention(nn.Module):
             future_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
             while future_mask.dim() < scaled_qk.dim():
                 future_mask = future_mask.unsqueeze(0)
+            future_mask = future_mask.to(scaled_qk.device)  
             scaled_qk = scaled_qk.masked_fill(future_mask,float("-inf"))
         
         if mask is not None:
