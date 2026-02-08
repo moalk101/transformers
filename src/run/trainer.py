@@ -144,13 +144,14 @@ def main():
     raw = ds.get_wmt17_datset()
     cleaned = raw.map(ds.clean_sentence_pair)
     cleaned = cleaned.filter(lambda x: x["keep"]).select(range(1200000))
-    # tokenizer = MyTokenizer(save_dir=r"C:\Users\modar\Desktop\Uni\transforemer\models\WMTBPETokenizer")
-    # iterator = corpus_iterator(cleaned)
-    # tokenizer.train(iterator)
+    if not os.path.exists(configs["tokenizer"] + "/tokenizer.json"):
+        print("training tokenizer")
+        tokenizer = MyTokenizer(save_dir=configs["tokenizer"])
+        iterator = corpus_iterator(cleaned)
+        tokenizer.train(iterator)
     tokenizer = MyTokenizer().load(configs["tokenizer"])
     pad_id = tokenizer.tokenizer.pad_token_id
     torchdataset = TranslationTorchDataset(cleaned,tokenizer)
-    # loader = DataLoader(torchdataset,batch_size=32,shuffle=True,collate_fn=lambda b: collate_fn(b, pad_id))
     model = Transformer(**configs["transformer"])
 
     train_size = 1000000
@@ -168,14 +169,6 @@ def main():
         torch.save(val_dataset.indices, configs["data_input_dir"] + "/val_indices.pt")
         torch.save(train_dataset.indices, configs["data_input_dir"] + "/train_indices.pt")
     collator = CollateWithPad(pad_id)
-
-    # lengths = compute_lengths(train_dataset)
-
-    # sampler = TokenBatchSampler(
-    #     lengths=lengths,
-    #     max_tokens=10000,  
-    #     shuffle=True
-    # )
 
     train_loader = DataLoader(
         train_dataset,
@@ -254,20 +247,8 @@ def main():
             loss.backward()
             optimizer.step()
             scheduler.step()
-
-            # if loss.item() < current_loss:
-            #     print("loss got better")
-            #     current_loss = loss.item()
-            #     checkpoint = {
-            #         "epoch": epoch,
-            #         "model_state": model.state_dict(),
-            #         "optimizer_state": optimizer.state_dict(),
-            #         "loss": current_loss,
-            #         "global_step" : global_step
-            #     }
-            #     torch.save(checkpoint, r"C:\Users\modar\Desktop\Uni\transforemer\models\Transformermodel\v4\checkpoint.pt")
-
             total_loss += loss.item()
+            
             if batch_idx % 100 == 0:
                 print(f"Epoch {epoch} Batch {batch_idx+1} Loss: {loss.item():.4f}")
                 writer.add_scalar("Loss/train", loss.item(), global_step)
