@@ -12,10 +12,7 @@ from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
 import sacrebleu
 from tqdm import tqdm
-
-
-
-
+import yaml
 
 def corpus_iterator(dictionary):
     for ex in dictionary:
@@ -136,6 +133,12 @@ def compute_bleu(
 
 
 def main():
+    yaml_path = "config/config.yaml"
+    with open(yaml_path,"r") as stream:
+        try:
+            configs = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
     
     ds = TranslationDataSet(limit=1500000)
     raw = ds.get_wmt17_datset()
@@ -144,26 +147,26 @@ def main():
     # tokenizer = MyTokenizer(save_dir=r"C:\Users\modar\Desktop\Uni\transforemer\models\WMTBPETokenizer")
     # iterator = corpus_iterator(cleaned)
     # tokenizer.train(iterator)
-    tokenizer = MyTokenizer().load(r"C:\Users\modar\Desktop\Uni\transforemer\models\WMTBPETokenizer")
+    tokenizer = MyTokenizer().load(configs["tokenizer"])
     pad_id = tokenizer.tokenizer.pad_token_id
     torchdataset = TranslationTorchDataset(cleaned,tokenizer)
     # loader = DataLoader(torchdataset,batch_size=32,shuffle=True,collate_fn=lambda b: collate_fn(b, pad_id))
-    model = Transformer(50000,512,8,6,6,2048,0.1,64)
+    model = Transformer(**configs["transformer"])
 
     train_size = 1000000
     val_size = 200000
 
     # Split the dataset
-    if os.path.exists(r"C:\Users\modar\Desktop\Uni\transforemer\data\train_indices.pt"):
+    if os.path.exists(configs["data_input_dir"] + "/val_indices.pt"):
         print("loading existing splits")
-        val_indices = torch.load(r"C:\Users\modar\Desktop\Uni\transforemer\data\val_indices.pt")
-        train_indices = torch.load(r"C:\Users\modar\Desktop\Uni\transforemer\data\train_indices.pt")
+        val_indices = torch.load(configs["data_input_dir"] + "/val_indices.pt")
+        train_indices = torch.load(configs["data_input_dir"] + "/train_indices.pt")
         val_dataset = Subset(torchdataset, val_indices)
         train_dataset = Subset(torchdataset, train_indices)
     else:
         train_dataset, val_dataset = random_split(torchdataset, [train_size, val_size])
-        torch.save(val_dataset.indices, r"C:\Users\modar\Desktop\Uni\transforemer\data\val_indices.pt")
-        torch.save(train_dataset.indices, r"C:\Users\modar\Desktop\Uni\transforemer\data\train_indices.pt")
+        torch.save(val_dataset.indices, configs["data_input_dir"] + "/val_indices.pt")
+        torch.save(train_dataset.indices, configs["data_input_dir"] + "/train_indices.pt")
     collator = CollateWithPad(pad_id)
 
     # lengths = compute_lengths(train_dataset)
@@ -208,8 +211,8 @@ def main():
     start_epoch = 0
     current_loss = 10000
     global_step = 0
-    if os.path.exists(r"C:\Users\modar\Desktop\Uni\transforemer\models\Transformermodel\v4\checkpoint.pt"):
-      ckpt = torch.load(r"C:\Users\modar\Desktop\Uni\transforemer\models\Transformermodel\v4\checkpoint.pt")
+    if os.path.exists(configs["model_output_dir"] + "/checkpoint.pt"):
+      ckpt = torch.load(configs["model_output_dir"] + "/checkpoint.pt")
       model.load_state_dict(ckpt["model_state"])
       optimizer.load_state_dict(ckpt["optimizer_state"])
       start_epoch = ckpt["epoch"] + 1
@@ -218,7 +221,7 @@ def main():
     
     
     num_epochs = 5
-    writer = SummaryWriter(log_dir=r"C:\Users\modar\Desktop\Uni\transforemer\models\Transformermodel\v4\log")
+    writer = SummaryWriter(log_dir=configs["model_output_dir"] + "/log")
     best_val_loss = 999999
     best_globsl_val_loss = 99999
     for epoch in range(start_epoch, num_epochs + 1):
@@ -282,7 +285,7 @@ def main():
                         "global_step" : global_step
                     }
                     best_val_loss = val_loss
-                    torch.save(checkpoint, r"C:\Users\modar\Desktop\Uni\transforemer\models\Transformermodel\v4\checkpoint_best_val_loss.pt")
+                    torch.save(checkpoint, configs["model_output_dir"] + "/checkpoint_best_val_loss.pt")
                 writer.add_scalar("Loss/val", val_loss, global_step)
                 writer.add_scalar("BLEU",bleu,global_step)
                 print(f"Epoch {epoch} Batch {batch_idx+1} Validation Loss: {val_loss:.4f}")
@@ -301,7 +304,7 @@ def main():
                 "global_step" : global_step
             }
             best_globsl_val_loss = globsl_val_loss
-            torch.save(checkpoint, r"C:\Users\modar\Desktop\Uni\transforemer\models\Transformermodel\v4\checkpoint_best_val_loss.pt")
+            torch.save(checkpoint, configs["model_output_dir"] + "/checkpoint_best_val_loss.pt")
         writer.add_scalar("Loss/val_all", globsl_val_loss, global_step)
         print(f"Val Loss: {globsl_val_loss:.4f}")
         avg_loss = total_loss / len(train_loader)

@@ -1,0 +1,12 @@
+tokenizer: models/WMTBPETokenizer
+transformer:
+  vocab_size: 50000
+  d_model: 512
+  n_heads: 8
+  num_encoder_layers: 6
+  num_decoder_layers: 6
+  dim_feedforward: 2048
+  dropout: 0.1
+  max_len: 64
+data_input_dir: data
+model_output_dir: models/Transformermodel/v5
